@@ -1,0 +1,69 @@
+---
+title: "Linear Analysis"
+output: html_notebook
+---
+
+```{r}
+df = read.csv("~/Desktop/New_South_Wales/Japan_Project/data/Japan_Visitor_Data.csv")
+```
+
+``` {r}
+period = 24
+
+length = dim(df)[1]
+
+df_train = df[1:(length - period),]
+x_train = ts(df_train$Daily_Visitors, start = c(1996,1), frequency = 12)
+df_test = df[((length - period)+1):length,]
+y <- ts(df_test$Daily_Visitors,
+        start = c(2024, 2),   # Feb 2024
+        frequency = 12)
+
+options(scipen = 999) # Turns off scientific notation
+```
+
+ets - no trend, no seasonality. Just a prediction based on the weighted average of past results. 
+
+```{r}
+library(forecast)
+model = ets(x_train, model = "ANN")
+fc_ANN = forecast(model, h = 24)
+```
+
+```{r}
+plot(fc_ANN)
+#accuracy(fc_ANN, y)
+```
+Next we are gonna forecast assuming a trend but with dampening (so the trend decreases over time)
+
+```{r}
+model = ets(x_train, model = "AAN", damped = TRUE)
+fc_AAdN = forecast(model, h = 24)
+```
+
+```{r}
+plot(fc_AAdN)
+#accuracy(fc_AAdN, y)
+```
+
+Now, we are going to forecast with both a multiplicative trend and a seasonal period of every 12 months
+
+```{r}
+y = ts(x_train, frequency = 12) # Setting the frequency - Once every 12 months
+model = ets(y, model = "MAM")
+fc_MAM = forecast(model, h = 24)
+plot(fc_MAM, ylab = "Visitors", xlab = "Year")
+#accuracy(fc_AAdN$mean, df_test$Daily_Visitors)
+```
+
+The error bars were way too big (possibly owing to the COVID pandemic making the mulitplicitive analysis too severe), so I'm going to try additive seasonality. 
+```{r}
+model = ets(x_train, model = "AAA")
+fc_AAA = forecast(model, h = 24)
+plot(fc_AAA, ylab = "Visitors", xlab = "Year")
+lines(df_test$Daily_Visitors, col = "black", lwd = 2)
+print(fc_AAA)
+```
+
+This looks much more reasonable
+
