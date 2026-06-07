@@ -4,8 +4,7 @@ I worked on this project over the Spring of 2026. I wanted to practice working w
 
 The following two PDFs contain an analysis of past visitor data as well as forecasts for international visitor levels to Japan over the next few years.  
 
-- [Part 1: Exploring the Data](Japan_Tourism_Analysis_Pt1.pdf)
+- [Part 1: Exploring the Data](https://millerz8.github.io/Joe_Japan_Tourism/Japan_Tourism_Analysis_Pt1.pdf)
 
-- [Part 2: Creating Forecasts](Japan_Tourism_Analysis_Pt2.pdf)
-
+- [Part 2: Creating Forecasts](https://millerz8.github.io/Joe_Japan_Tourism/Japan_Tourism_Analysis_Pt2.pdf)
 
