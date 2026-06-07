@@ -1,0 +1,133 @@
+---
+title: "Linear Analysis"
+output: html_notebook
+---
+
+```{r}
+df = read.csv("~/Desktop/New_South_Wales/Japan_Project/data/Japan_Visitor_Data.csv")
+```
+
+``` {r}
+period = 24
+
+length = dim(df)[1]
+
+df_train = df[1:(length - period),]
+x_train = ts(df_train$Daily_Visitors, start = c(1996,1), frequency = 12)
+df_test = df[((length - period)+1):length,]
+y <- ts(df_test$Daily_Visitors,
+        start = c(2024, 2),   # Feb 2024
+        frequency = 12)
+
+options(scipen = 999) # Turns off scientific notation
+```
+
+Simple ets (exponential smoothing). This method assumes no trend and no seasonality. Just a prediction based on the weighted average of past results applied to the rest of the forecasted data. This data clearly has both a trend and seasonal component, but we'll try out this out for posterity's sake.
+
+```{r}
+library(forecast)
+model = ets(x_train, model = "ANN")
+fc_ANN = forecast(model, h = 24)
+```
+
+```{r}
+plot(fc_ANN, main = "Japan Visitor Data - Simple Exponential Smoothing", ylab = "Average Daily International Visitors")
+#accuracy(fc_ANN, y)
+```
+Next we are going to forecast assuming a trend but with dampening (so the strength of the trend decreases over time - slope trends towards zero). The trend is calculated in a manner similar to the level - the trend is estimated over the previous results and weighted based on its proximity to the previous entries. 
+
+Note - using the "forecast" package for ets
+
+```{r}
+model = ets(x_train, model = "AAN", damped = TRUE)
+fc_AAdN = forecast(model, h = 24)
+```
+
+```{r}
+plot(fc_AAdN, main = "Japan Visitor Data - Holt's Linear Method With a Dampened Trend", ylab = "Average Daily International Visitors")
+
+```
+
+Now, we are going to forecast with both a multiplicative trend and a seasonal period of every 12 months
+
+```{r}
+model = ets(x_train, model = "MAM")
+fc_MAM = forecast(model, h = 24)
+plot(fc_MAM, ylab = "Visitors", xlab = "Year")
+#accuracy(fc_AAdN$mean, df_test$Daily_Visitors)
+```
+
+The error bars were way too big. This is probably owing to the COVID pandemic making the multiplicative analysis too severe. There shouldn't be too many close-to-zero values in the data. I'm going to try additive seasonality. 
+
+```{r}
+model = ets(x_train, model = "AAA")
+fc_AAA1 = forecast(model, h = 24)
+plot(fc_AAA1, ylab = "Visitors", xlab = "Year")
+lines(df_test$Daily_Visitors, col = "black", lwd = 2)
+print(fc_AAA1)
+```
+
+This looks much more reasonable. Now that we've seen some different types of ETS, we should select a final model. We can use the ETS() function to select the model based on it's AIC
+
+```{r}
+library(fpp3)
+final_model = ets(x_train)
+fc <- forecast(final_model, h = 24)
+plot(fc, ylab = "Average Daily International Visitors", main = "Japan Visitor Data - Holt-Winters' Additive Method w/ Dampening")
+```
+
+Looks like the recommended forecast is also (A, Ad, A), which indicates a level, a linear-ish trend, and additive seasonal effects.
+
+Now that we have our final model, let's compute the accuracy of this forecast throughout the future observations. I'll use MSE and RMSE for simplicity. 
+
+```{r}
+autoplot(fc) +
+  autolayer(fc$mean, series = "Projected Visitors") +
+  autolayer(y, series = "Actual visitors") +
+  labs(
+    title = "Forecast vs Actual Values - Japan Visitors",
+    x = "",
+    y = "Average Daily Visitors"
+  )
+```
+
+As we can see by this chart, the projected visitors was a dramatic underestimate of the actual # of visitors. However, it appeared to be in a reasonable range when taken with the context of the prediction intervals. 
+
+```{r}
+# Calculating error 
+accuracy = accuracy(fc$mean,y)
+accuracy = round(accuracy, 1)
+write.csv(accuracy, "data/Testing_Error.csv", row.names = TRUE)
+accuracy
+```
+
+The RMSE is 21656.01. Let's use this method on the next observatinos to predict the future 
+
+```{r}
+x = ts(df$Daily_Visitors, start = c(1996,1), frequency = 12)
+model = ets(x, model = "AAA")
+fc_AAA = forecast(model, h = 24)
+plot(fc_AAA, ylab = "Average Daily International Visitors", xlab = "Year", main = "Forecasted Average Daily Visitors to Japan")
+lines(df_test$Daily_Visitors, col = "black", lwd = 2)
+print(fc_AAA)
+```
+
+```{r}
+plot(fc_AAA, ylab = "Visitors", xlab = "Year", main = "Forecasted Average Daily Visitors to Japan", xlim = c(2021, 2029))
+```
+
+The visitor levels are projected to remain mostly flat over the next few years. This may be due to a recent slowdown in visitors, partially due to a precipitous decrease in the number of Chinese visitors due to a recent diplomatic spat between the two countries.
+
+The month-to-month changes appear to be minimal.
+
+```{r}
+fc_AAA_df <- as.data.frame(fc_AAA)
+fc_AAA_df = round(fc_AAA_df, 1)
+write.csv(fc_AAA_df, "data/Japan_Predictions.csv", row.names = TRUE)
+fc_AAA_df <- fc_AAA_df[order(fc_AAA_df[, "Point Forecast"]), ]
+fc_AAA_df
+
+```
+
+According to the point forecast, September 2027 will be the least crowded month to visit at 112640.6 average daily visitors, closely followed by 112783.8. The prediction intervals are quite large, at [74734.12, 150547.0], so this should be taken with a grain of salt. If you want to pick a date with lower risk, September 2026, with an 80 prediction interval of [91903.40, 133664.2], might be a better option.
+
